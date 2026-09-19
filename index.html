@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIFT Official Archive</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- ALL JAVASCRIPT FUNCTIONS (PLACED FIRST TO PREVENT REFERENCE ERRORS) -->
+    <script>
+        let isLoggedAdmin = false;
+
+        function openAdminModal() {
+            if (isLoggedAdmin) {
+                document.getElementById('admin-dashboard-modal').classList.remove('hidden');
+                document.getElementById('admin-dashboard-modal').classList.add('flex');
+            } else {
+                document.getElementById('admin-login-modal').classList.remove('hidden');
+                document.getElementById('admin-login-modal').classList.add('flex');
+            }
+        }
+
+        function closeAdminLogin() {
+            document.getElementById('admin-login-modal').classList.remove('flex');
+            document.getElementById('admin-login-modal').classList.add('hidden');
+        }
+
+        function closeAdminDashboard() {
+            document.getElementById('admin-dashboard-modal').classList.remove('flex');
+            document.getElementById('admin-dashboard-modal').classList.add('hidden');
+        }
+
+        function adminLogin() {
+            const idInput = document.getElementById('admin-id').value.trim();
+            const passInput = document.getElementById('admin-pass').value.trim();
+
+            if (idInput === 'admin' && passInput === 'dift2026') {
+                isLoggedAdmin = true;
+                closeAdminLogin();
+                document.getElementById('login-error').classList.add('hidden');
+                document.getElementById('admin-btn-text').innerText = "Dashboard";
+                openAdminModal();
+                searchData();
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        }
+
+        function adminLogout() {
+            isLoggedAdmin = false;
+            closeAdminDashboard();
+            document.getElementById('admin-pass').value = '';
+            document.getElementById('admin-btn-text').innerText = "Admin Login";
+            cancelEdit();
+            searchData();
+        }
+
+        function getStoredData() {
+            try {
+                return JSON.parse(localStorage.getItem('dift_archive_db')) || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        async function saveDataToSystem() {
+            const editUid = document.getElementById('edit-uid').value;
+            const type = document.getElementById('field-type').value;
+            const dept = document.getElementById('field-dept').value;
+            const name = document.getElementById('field-name').value.trim();
+            const id = document.getElementById('field-id').value.trim();
+            const session = document.getElementById('field-session').value.trim();
+            const contact = document.getElementById('field-contact').value.trim();
+
+            const photoFile = document.getElementById('field-photo').files[0];
+            const docFile = document.getElementById('field-doc').files[0];
+
+            if (!name || !id) {
+                alert("অনুগ্রহ করে নাম এবং আইডি প্রদান করুন!");
+                return;
+            }
+
+            let data = getStoredData();
+
+            let photoBase64 = '';
+            let docBase64 = '';
+            let docName = '';
+
+            if (photoFile) photoBase64 = await fileToBase64(photoFile);
+            if (docFile) {
+                docBase64 = await fileToBase64(docFile);
+                docName = docFile.name;
+            }
+
+            if (editUid) {
+                const index = data.findIndex(item => item.uid == editUid);
+                if (index !== -1) {
+                    data[index].type = type;
+                    data[index].dept = dept;
+                    data[index].name = name;
+                    data[index].id = id;
+                    data[index].session = session;
+                    data[index].contact = contact;
+                    if (photoBase64) data[index].photo = photoBase64;
+                    if (docBase64) {
+                        data[index].document = docBase64;
+                        data[index].docName = docName;
+                    }
+                }
+                alert("তথ্য সফলভাবে আপডেট করা হয়েছে!");
+            } else {
+                const record = {
+                    uid: Date.now(),
+                    type, dept, name, id, session, contact,
+                    photo: photoBase64,
+                    document: docBase64,
+                    docName: docName
+                };
+                data.push(record);
+                alert("নতুন রেকর্ড সফলভাবে সেভ হয়েছে!");
+            }
+
+            try {
+                localStorage.setItem('dift_archive_db', JSON.stringify(data));
+            } catch(e) {
+                alert("ফাইল সাইজ বেশি বড়! ছোট সাইজের ফাইল আপলোড করুন।");
+            }
+
+            cancelEdit();
+            closeAdminDashboard();
+            searchData();
+        }
+
+        function editRecord(uid) {
+            const data = getStoredData();
+            const record = data.find(item => item.uid === uid);
+            if (!record) return;
+
+            document.getElementById('edit-uid').value = record.uid;
+            document.getElementById('field-type').value = record.type;
+            document.getElementById('field-dept').value = record.dept;
+            document.getElementById('field-name').value = record.name;
+            document.getElementById('field-id').value = record.id;
+            document.getElementById('field-session').value = record.session || '';
+            document.getElementById('field-contact').value = record.contact || '';
+
+            document.getElementById('form-title').innerText = "তথ্য সংশোধন (Edit Mode)";
+            document.getElementById('form-submit-btn').innerHTML = `<i class="fa-solid fa-pen-to-square mr-1"></i> আপডেট করুন`;
+            document.getElementById('cancel-edit-btn').classList.remove('hidden');
+
+            openAdminModal();
+        }
+
+        function cancelEdit() {
+            document.getElementById('edit-uid').value = '';
+            document.getElementById('upload-form').reset();
+            document.getElementById('form-title').innerText = "অ্যাডমিন কন্ট্রোল প্যানেল";
+            document.getElementById('form-submit-btn').innerHTML = `<i class="fa-solid fa-floppy-disk mr-1"></i> ডাটা সেভ করুন`;
+            document.getElementById('cancel-edit-btn').classList.add('hidden');
+        }
+
+        function deleteRecord(uid) {
+            if (confirm("আপনি কি নিশ্চিতভাবে এই রেকর্ডটি মুছে ফেলতে চান?")) {
+                let data = getStoredData();
+                data = data.filter(item => item.uid !== uid);
+                localStorage.setItem('dift_archive_db', JSON.stringify(data));
+                searchData();
+            }
+        }
+
+        function searchData() {
+            const query = (document.getElementById('public-search')?.value || '').toLowerCase();
+            const filterType = document.getElementById('filter-type')?.value || 'ALL';
+            const filterDept = document.getElementById('filter-dept')?.value || 'ALL';
+
+            const data = getStoredData();
+            const container = document.getElementById('results-grid');
+            if(!container) return;
+
+            container.innerHTML = '';
+
+            const filtered = data.filter(item => {
+                const matchesType = (filterType === 'ALL') || (item.type === filterType);
+                const matchesDept = (filterDept === 'ALL') || (item.dept === filterDept);
+                const matchesQuery = (item.name && item.name.toLowerCase().includes(query)) || 
+                                     (item.id && item.id.toLowerCase().includes(query)) || 
+                                     (item.contact && item.contact.toLowerCase().includes(query));
+                
+                return matchesType && matchesDept && matchesQuery;
+            });
+
+            document.getElementById('record-count').innerText = filtered.length;
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full bg-white p-10 rounded-3xl text-center border border-slate-200">
+                        <i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-2"></i>
+                        <p class="text-sm font-bold text-slate-600">কোনো তথ্য পাওয়া যায়নি</p>
+                    </div>`;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const defaultPhoto = "https://via.placeholder.com/150?text=DIFT";
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-3xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between";
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-start gap-3 mb-3">
+                            <img src="${item.photo || defaultPhoto}" class="w-16 h-16 rounded-2xl object-cover border border-slate-300 flex-shrink-0">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded ${item.type === 'Student' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${item.type}</span>
+                                <h3 class="font-bold text-slate-900 text-base leading-tight mt-1">${item.name}</h3>
+                                <p class="text-xs text-slate-500">ID: ${item.id}</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl mb-3">
+                            <p><strong>Dept:</strong> ${item.dept}</p>
+                            ${item.session ? `<p><strong>Session:</strong> ${item.session}</p>` : ''}
+                            ${item.contact ? `<p><strong>Contact:</strong> ${item.contact}</p>` : ''}
+                        </div>
+                    </div>
+
+                    <div>
+                        ${item.document ? `
+                            <a href="${item.document}" download="${item.docName || 'Document'}" class="flex items-center justify-center gap-1.5 w-full text-xs bg-slate-900 text-white font-bold py-2.5 rounded-xl">
+                                <i class="fa-solid fa-download"></i> ফাইল ডাউনলোড
+                            </a>
+                        ` : ''}
+
+                        ${isLoggedAdmin ? `
+                            <div class="flex gap-2 mt-2 pt-2 border-t border-slate-100">
+                                <button type="button" onclick="editRecord(${item.uid})" class="w-1/2 text-xs bg-amber-100 text-amber-900 font-bold py-1.5 rounded-lg">Edit</button>
+                                <button type="button" onclick="deleteRecord(${item.uid})" class="w-1/2 text-xs bg-red-100 text-red-700 font-bold py-1.5 rounded-lg">Delete</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        window.onload = function() {
+            searchData();
+        };
+    </script>
+</head>
+<body class="bg-slate-100 min-h-screen font-sans pb-12">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 text-white p-2 rounded-xl font-black text-lg">DIFT</div>
+                <div>
+                    <h1 class="font-bold text-sm leading-tight">DIFT Archive</h1>
+                    <p class="text-[9px] text-slate-400">Dhaka Institute of Fashion & Technology</p>
+                </div>
+            </div>
+            
+            <button type="button" onclick="openAdminModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-2">
+                <i class="fa-solid fa-user-shield"></i>
+                <span id="admin-btn-text">Admin Login</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto px-4 mt-6">
+        <div class="bg-white p-4 rounded-3xl shadow-sm border border-slate-200 mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input type="text" id="public-search" onkeyup="searchData()" placeholder="নাম, আইডি বা ফোন দিয়ে খুঁজুন..." class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs focus:outline-none focus:border-blue-600">
+                <select id="filter-type" onchange="searchData()" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs focus:outline-none focus:border-blue-600">
+                    <option value="ALL">সকল ক্যাটাগরি</option>
+                    <option value="Student">Student</option>
+                    <option value="Teacher">Teacher/Staff</option>
+                </select>
+                <select id="filter-dept" onchange="searchData()" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs focus:outline-none focus:border-blue-600">
+                    <option value="ALL">সকল ডিপার্টমেন্ট</option>
+                    <option value="Textile Engineering">Textile Engineering</option>
+                    <option value="FDT">FDT</option>
+                    <option value="KMT">KMT</option>
+                    <option value="AMT">AMT</option>
+                </select>
+            </div>
+            <div class="mt-3 text-xs text-slate-500 font-semibold px-1">
+                মোট রেকর্ড পাওয়া গেছে: <span id="record-count" class="text-blue-600 font-bold">0</span> টি
+            </div>
+        </div>
+
+        <div id="results-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </main>
+
+    <!-- Admin Login Modal -->
+    <div id="admin-login-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative">
+            <button type="button" onclick="closeAdminLogin()" class="absolute top-4 right-4 text-slate-400 p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <div class="text-center mb-4">
+                <h2 class="text-lg font-bold text-slate-900">এডমিন লগইন</h2>
+            </div>
+            <div id="login-error" class="hidden bg-red-50 text-red-600 text-xs p-2.5 rounded-xl mb-3 text-center">ভুল পাসওয়ার্ড!</div>
+            <div class="space-y-3">
+                <input type="text" id="admin-id" placeholder="User ID (admin)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+                <input type="password" id="admin-pass" placeholder="Password (dift2026)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+                <button type="button" onclick="adminLogin()" class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs">লগইন</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard Modal -->
+    <div id="admin-dashboard-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 items-center justify-center p-4 hidden overflow-y-auto">
+        <div class="bg-white w-full max-w-lg rounded-3xl p-5 shadow-2xl relative my-6 max-h-[90vh] overflow-y-auto">
+            <button type="button" onclick="closeAdminDashboard()" class="absolute top-4 right-4 text-slate-400 p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <h2 id="form-title" class="text-base font-bold text-slate-900 mb-3 border-b pb-2">অ্যাডমিন কন্ট্রোল প্যানেল</h2>
+
+            <form id="upload-form" onsubmit="event.preventDefault(); saveDataToSystem();" class="space-y-3">
+                <input type="hidden" id="edit-uid">
+                <div class="grid grid-cols-2 gap-2">
+                    <select id="field-type" class="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-xs">
+                        <option value="Student">Student</option>
+                        <option value="Teacher">Teacher/Staff</option>
+                    </select>
+                    <select id="field-dept" class="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-xs">
+                        <option value="Textile Engineering">Textile Engineering</option>
+                        <option value="FDT">FDT</option>
+                        <option value="KMT">KMT</option>
+                        <option value="AMT">AMT</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" id="field-name" required placeholder="নাম *" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+                    <input type="text" id="field-id" required placeholder="আইডি/পদবী *" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" id="field-session" placeholder="সেশন/ব্যাচ" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+                    <input type="text" id="field-contact" placeholder="যোগাযোগ" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">ছবি ফাইল</label>
+                    <input type="file" id="field-photo" accept="image/*" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">ডকুমেন্ট/পিডিএফ</label>
+                    <input type="file" id="field-doc" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs">
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" id="form-submit-btn" class="flex-1 bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl">ডাটা সেভ করুন</button>
+                    <button type="button" id="cancel-edit-btn" onclick="cancelEdit()" class="hidden bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2.5 rounded-xl">বাতিল</button>
+                </div>
+            </form>
+
+            <div class="mt-4 pt-3 border-t flex justify-end">
+                <button type="button" onclick="adminLogout()" class="text-xs bg-red-100 text-red-600 font-bold px-3 py-1.5 rounded-lg">লগআউট</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
